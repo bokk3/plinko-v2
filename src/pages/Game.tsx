@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import Navbar from '../components/Navbar';
+import { CreditsContext } from '../components/CreditsContext';
 import PlinkoCanvas from '../components/PlinkoCanvas';
 import { supabase } from '../supabaseClient';
 
 export default function Game() {
+  const { refreshCredits } = useContext(CreditsContext);
   const [bet, setBet] = useState(10);
   const [ballsInPlay, setBallsInPlay] = useState(0);
   const [dropCount, setDropCount] = useState(0);
   const [sessionWin, setSessionWin] = useState(0);
-  const [sessionLoss, setSessionLoss] = useState(0);
   const [lastResults, setLastResults] = useState<Array<{ slot: number; multiplier: number; win: number }>>([]);
   const [credits, setCredits] = useState<number>(100);
 
@@ -33,19 +34,53 @@ export default function Game() {
   }, []);
 
   function handleBallLanded(slot: number, multiplier: number) {
-    const win = Math.round(bet * multiplier);
-    setSessionWin((w: number) => w + win);
-    setSessionLoss((l: number) => l + bet - win);
-    setLastResults((results: Array<{ slot: number; multiplier: number; win: number }>) => [...results, { slot, multiplier, win }]);
-    setBallsInPlay((n: number) => Math.max(0, n - 1));
-    // TODO: Save game to Supabase
+    const payout = Math.round(bet * multiplier);
+    // Debug log
+    // eslint-disable-next-line no-console
+    console.log(`handleBallLanded: slot=${slot}, multiplier=${multiplier}, bet=${bet}, payout=${payout}`);
+    setCredits(c => c + payout);
+    const netWin = payout - bet;
+    setSessionWin(w => w + netWin);
+    setLastResults(results => {
+      if (results.some(r => r.slot === slot && r.multiplier === multiplier && r.win === netWin)) {
+        return results;
+      }
+      return [...results, { slot, multiplier, win: netWin }];
+    });
+    setBallsInPlay(n => Math.max(0, n - 1));
   }
 
-  function handleDropBall() {
+  async function handleDropBall() {
+    let didBet = false;
+    setCredits(c => {
+      if (ballsInPlay >= 10 || c < bet) return c;
+      didBet = true;
+      return c - bet;
+    });
     if (ballsInPlay >= 10 || credits < bet) return;
-    setCredits((c: number) => c - bet);
-    setBallsInPlay((n: number) => n + 1);
-    setDropCount((c) => c + 1);
+    setBallsInPlay(n => n + 1);
+    setDropCount(c => c + 1);
+
+    // Update credits in DB immediately after bet
+    if (didBet) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        // Use the latest credits value after bet
+        setTimeout(async () => {
+          const {
+            data: { user: u },
+          } = await supabase.auth.getUser();
+          if (u) {
+            await supabase
+              .from('profiles')
+              .update({ credits: credits - bet })
+              .eq('id', u.id);
+          }
+        }, 0);
+      }
+    }
   }
 
   async function handleCashOut() {
@@ -56,15 +91,14 @@ export default function Game() {
     } = await supabase.auth.getUser();
     if (!user || userError) {
       setSessionWin(0);
-      setSessionLoss(0);
       setLastResults([]);
       return;
     }
 
-    // Update credits in profiles table
+    // Update credits in profiles table (credits already updated per ball, just sync current value)
     await supabase
       .from('profiles')
-      .update({ credits: credits + sessionWin })
+      .update({ credits })
       .eq('id', user.id);
 
     // Insert game results
@@ -88,8 +122,9 @@ export default function Game() {
     }
 
     setSessionWin(0);
-    setSessionLoss(0);
     setLastResults([]);
+    // Notify Navbar to refresh credits
+    if (refreshCredits) refreshCredits();
   }
 
   return (
@@ -107,12 +142,8 @@ export default function Game() {
               <div className="text-2xl font-bold text-indigo-600">{credits}</div>
             </div>
             <div className="bg-white rounded-xl shadow p-4 text-center w-32">
-              <div className="text-gray-500 text-sm">Session Win</div>
-              <div className="text-2xl font-bold text-green-500">{sessionWin}</div>
-            </div>
-            <div className="bg-white rounded-xl shadow p-4 text-center w-32">
-              <div className="text-gray-500 text-sm">Session Loss</div>
-              <div className="text-2xl font-bold text-red-500">{sessionLoss}</div>
+              <div className="text-gray-500 text-sm">Session Win/Loss</div>
+              <div className={`text-2xl font-bold ${sessionWin >= 0 ? 'text-green-500' : 'text-red-500'}`}>{sessionWin}</div>
             </div>
           </div>
           <div className="bg-white rounded-xl shadow p-4 flex flex-col items-center w-full">

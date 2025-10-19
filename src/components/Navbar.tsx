@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useRegisterCreditsRefresh } from './CreditsContext';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,28 +8,32 @@ export default function Navbar() {
   const [loggedIn, setLoggedIn] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    async function fetchProfile() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        setLoggedIn(true);
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('email, credits')
-          .eq('id', user.id)
-          .single();
-        if (!error && data) {
-          setProfile(data);
-        }
-      } else {
-        setLoggedIn(false);
-        setProfile(null);
+  const fetchProfile = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      setLoggedIn(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('email, credits')
+        .eq('id', user.id)
+        .single();
+      if (!error && data) {
+        setProfile(data);
       }
+    } else {
+      setLoggedIn(false);
+      setProfile(null);
     }
-    fetchProfile();
   }, []);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  // Register refresh function for CreditsContext
+  useRegisterCreditsRefresh(fetchProfile);
 
   async function handleLogout() {
     await supabase.auth.signOut();

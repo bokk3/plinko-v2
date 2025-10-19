@@ -48,8 +48,10 @@ function generatePegs(): Peg[] {
 export default function PlinkoCanvas({ onBallLanded, dropCount }: { onBallLanded: (slot: number, multiplier: number) => void, dropCount: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [balls, setBalls] = useState<Ball[]>([]);
+  const [landedQueue, setLandedQueue] = useState<Array<{ slot: number; multiplier: number }>>([]);
   const pegs = useRef(generatePegs());
   const ballId = useRef(0);
+  const processedBallIds = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     if (dropCount > 0) {
@@ -102,9 +104,20 @@ export default function PlinkoCanvas({ onBallLanded, dropCount }: { onBallLanded
             }
           });
           if (y + BALL_RADIUS >= CANVAS_HEIGHT - 40) {
-            const landedSlot = Math.floor((x / CANVAS_WIDTH) * SLOTS);
-            onBallLanded(landedSlot, MULTIPLIERS[landedSlot] || 1);
-            return { ...ball, x, y: CANVAS_HEIGHT - 40, vx, vy, landed: true, slot: landedSlot };
+            // Only process if not already processed
+            if (!processedBallIds.current.has(ball.id)) {
+              let landedSlot = Math.floor((x / CANVAS_WIDTH) * SLOTS);
+              // Clamp to valid slot range
+              if (landedSlot < 0) landedSlot = 0;
+              if (landedSlot >= SLOTS) landedSlot = SLOTS - 1;
+              const multiplier = MULTIPLIERS[landedSlot] || 1;
+              // Debug log
+              // eslint-disable-next-line no-console
+              console.log(`Ball landed: slot=${landedSlot}, multiplier=${multiplier}`);
+              setLandedQueue(q => [...q, { slot: landedSlot, multiplier }]);
+              processedBallIds.current.add(ball.id);
+            }
+            return { ...ball, x, y: CANVAS_HEIGHT - 40, vx, vy, landed: true, slot: Math.floor((x / CANVAS_WIDTH) * SLOTS) };
           }
           return { ...ball, x, y, vx, vy };
         })
@@ -114,6 +127,16 @@ export default function PlinkoCanvas({ onBallLanded, dropCount }: { onBallLanded
     animate();
     return () => cancelAnimationFrame(animationFrame);
   }, [balls.length]);
+
+  // Call onBallLanded after render for each newly landed ball
+  useEffect(() => {
+    if (landedQueue.length > 0) {
+      landedQueue.forEach(({ slot, multiplier }) => {
+        onBallLanded(slot, multiplier);
+      });
+      setLandedQueue([]);
+    }
+  }, [landedQueue, onBallLanded]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
