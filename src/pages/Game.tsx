@@ -39,6 +39,7 @@ export default function Game() {
     // eslint-disable-next-line no-console
     console.log(`handleBallLanded: slot=${slot}, multiplier=${multiplier}, bet=${bet}, payout=${payout}`);
     setCredits(c => c + payout);
+    if (refreshCredits) refreshCredits();
     const netWin = payout - bet;
     setSessionWin(w => w + netWin);
     setLastResults(results => {
@@ -77,6 +78,7 @@ export default function Game() {
               .from('profiles')
               .update({ credits: credits - bet })
               .eq('id', u.id);
+            if (refreshCredits) refreshCredits();
           }
         }, 0);
       }

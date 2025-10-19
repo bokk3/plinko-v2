@@ -20,7 +20,7 @@ export default function AuthForm() {
 
   useEffect(() => {
     if (user) {
-      navigate('/game');
+      navigate('/games');
     }
   }, [user, navigate]);
 
