@@ -1,11 +1,12 @@
-
 import './index.css';
 import { useNavigate } from 'react-router-dom';
+import Navbar from './components/Navbar';
 
 function App() {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen flex flex-col">
+      <Navbar />
       <header className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white py-16 px-8 text-center flex-1 flex items-center justify-center">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-5xl md:text-6xl font-bold mb-4 drop-shadow-lg">
@@ -27,7 +28,6 @@ function App() {
           </div>
         </div>
       </header>
-      {/* ...existing code... */}
       <section className="py-16 px-8 bg-gray-50">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-center text-4xl font-bold mb-12 text-gray-800">
@@ -55,7 +55,6 @@ function App() {
           </div>
         </div>
       </section>
-      {/* ...existing code... */}
       <footer className="bg-gray-800 text-white text-center py-8 mt-auto">
         <p className="opacity-80">
           &copy; 2025 Plinko v2. Ready to drop some balls and win big?
