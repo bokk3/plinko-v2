@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 
 export default function AuthForm() {
   const { user, error, loading, signUp, signIn, signOut } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -15,6 +17,12 @@ export default function AuthForm() {
       await signUp(email, password);
     }
   }
+
+  useEffect(() => {
+    if (user) {
+      navigate('/game');
+    }
+  }, [user, navigate]);
 
   return (
     <div className="max-w-md mx-auto mt-12 p-8 bg-white rounded-xl shadow">
